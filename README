@@ -1,0 +1,37 @@
+URL CANONICALIZATION
+
+This is a set a C functions to manipulate URL strings and achieve URL
+Canonicalization as described by Google in its Safe Browsing developer's
+guide. See :
+
+https://developers.google.com/safe-browsing/developers_guide_v3#Canonicalization
+
+It includes the following functions (see url.h for full documentation) :
+
+- url_RemoveTabCRLF() : remove leading and trailing spaces, as well as tab
+  (0x09), CR (0x0d), and LF (0x0a) characters from the URL.
+
+- url_RemoveFragment() : Remove the fragment part of an URL.
+
+- url_Unescape() : Percent-decode an URL, calling itself until there is no 
+  more percent-decoding to be done.
+
+- url_Normalize() : Apply URL normalization rules as described in Google Safe
+  Borwsing Developer's Guide.
+
+- url_Escape() : Percent-encode an URL.
+
+- url_Canonicalize() : Canonicalize an URL by successvely calling all above
+  functions.
+
+All these functions are supposed to be thread safe.
+
+url-test.c implements the tests provided by Google in its documentation to
+help validate a canonicalization implementation. Only one test is known to 
+fail because canonicalization of IP addresses is currently not supported. 
+In case the host name has been replaced by an IP address, the address will 
+simply be kept unchanged.
+
+To compile : gcc url-test.c url.c -o url-test
+Tu run tests : ./url-test
+
