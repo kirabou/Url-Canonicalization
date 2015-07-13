@@ -62,6 +62,8 @@ extern char *url_Normalize(char *src, long len, long *new_len);
  *                 Or NULL if error.
  */
 extern char *url_Escape(char *src, long len, long *new_len);
+extern char *url_EscapeIncludingReservedChars(char *src, long len, long *new_len);
+
 
 /**
  * Canonicalize an URL as described in 
@@ -76,6 +78,7 @@ extern char *url_Escape(char *src, long len, long *new_len);
  *                 or NULL if error. Must be freed with free().
  */
 extern char *url_Canonicalize(char *src, long len, long *new_len);
+extern char *url_CanonicalizeWithFullEscape(char *src, long len, long *new_len);
 
 
 #endif

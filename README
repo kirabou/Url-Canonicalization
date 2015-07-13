@@ -32,6 +32,6 @@ fail because canonicalization of IP addresses is currently not supported.
 In case the host name has been replaced by an IP address, the address will 
 simply be kept unchanged.
 
-To compile : gcc url-test.c url.c -o url-test
-Tu run tests : ./url-test
+To compile : gcc test_url.c url.c -o test_url
+Tu run tests : ./test_url
 

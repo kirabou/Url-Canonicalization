@@ -1,7 +1,7 @@
 /*
 	Implements a few useful function to manipulate URLs.
 	They have been written to achieved URL canonicalization, as defined in 
-	https://developers.google.com/safe-browsing/developers_guide_v3#Canonicalization.
+	https://developers.google.com/safe-browsing/developers_guide_v3#Canonicalization
  */
 
 
@@ -26,6 +26,19 @@ static inline int url_DecodePercent(char *s) {
 		return(-1);
 }
 
+
+static char *url_RFC3986_ReservedChars = "!*'();:@&=+$,/?#[]";
+
+static inline bool url_IsReserved(char c)
+{
+	char *ptr = url_RFC3986_ReservedChars;
+	while(*ptr)
+		if(*ptr==c)
+			return(true);
+		else 
+			ptr++;
+	return(false);
+}
 
 
 
@@ -324,6 +337,36 @@ extern char *url_Escape(char *src, long len, long *new_len)
 }
 
 
+
+extern char *url_EscapeIncludingReservedChars(char *src, long len, long *new_len)
+{
+	unsigned char *usrc = (unsigned char *)src;
+	if(len==0)
+		len = strlen(src);
+
+	char *dest = malloc(3*len+1);
+	if(dest==NULL)
+		return(NULL);
+	char *begin_dest = dest;
+
+	while(*usrc) {
+		if(*usrc<=32 || *usrc>=127 || *usrc=='%' || url_IsReserved((char)*usrc)) {
+			sprintf(dest, "%%%02X", *(usrc++));
+			dest +=3;
+		} else {
+			*(dest++) = *(usrc++);
+		}
+	}
+
+	*dest='\0';
+
+	if(new_len)
+		*new_len = dest - begin_dest;
+	return(begin_dest);	
+}
+
+
+
 /**
  * Canonicalize an URL as described in 
  * https://developers.google.com/safe-browsing/developers_guide_v3#Canonicalization.
@@ -362,3 +405,30 @@ extern char *url_Canonicalize(char *src, long len, long *new_len)
 	return(str4);
 }
 
+
+extern char *url_CanonicalizeWithFullEscape(char *src, long len, long *new_len)
+{
+	long tmp;
+	// printf("%-16s = [%s]\n", "SRC", src);
+	if(new_len == NULL)
+		new_len = &tmp;
+	char *str1 = url_RemoveTabCRLF(src, len, new_len);
+	// printf("%-16s = [%s]\n", "CLEANED", str1);
+	// printf("new_len = %ld\n", *new_len);
+	url_RemoveFragment(str1, new_len);
+	// printf("%-16s = [%s]\n", "FRAGMENT REMOVED", str1);
+	// printf("new_len = %ld\n", *new_len);	
+	char *str2 = url_Unescape(str1, *new_len, new_len);
+	// printf("%-16s = [%s]\n", "UNESCAPED", str2);
+	// printf("new_len = %ld\n", *new_len);		
+	char *str3 = url_Normalize(str2, *new_len, new_len);
+	// printf("%-16s = [%s]\n", "NORMALIZED", str3);
+	// printf("new_len = %ld\n", *new_len);	
+	char *str4 = url_EscapeIncludingReservedChars(str3, *new_len, new_len);
+	// printf("%-16s = [%s]\n", "ESCAPED", str4);
+	// printf("new_len = %ld\n", *new_len);		
+	free(str1);
+	free(str2);
+	free(str3);
+	return(str4);
+}
