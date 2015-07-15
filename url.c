@@ -115,15 +115,6 @@ extern char *url_RemoveTabCRLF(const char *string, long len, long *new_len)
  */
 extern char *url_RemoveFragment(char *string, long *new_len)
 {
-	// for(char *p=string; *p; p++)
-	// 	if(*p == '#') {
-	// 		*p = '\0';
-	// 		if(new_len)
-	// 			*new_len = p - string;
-	// 		return(p+1);
-	// 	}
-	// return(NULL);
-
 	char *p = string;
 	for( ; *p && *p!='#'; p++)
 		;
@@ -134,7 +125,6 @@ extern char *url_RemoveFragment(char *string, long *new_len)
 		return(p+1);
 	} else 
 		return(NULL);
-
 }
 
 
@@ -148,18 +138,6 @@ extern char *url_RemoveFragment(char *string, long *new_len)
  */
 extern char *url_RemoveQuery(char *string, long *new_len)
 {
-	// char *p = string;
-	// for( ; *p; p++)
-	// 	if(*p == '?') {
-	// 		*p = '\0';
-	// 		if(new_len)
-	// 			*new_len = p - string;
-	// 		return(p+1);
-	// 	}
-	// if(new_len)
-	// 	*new_len = p - string;
-	// return(NULL);
-
 	char *p = string;
 	for( ; *p && *p!='?'; p++)
 		;
@@ -731,7 +709,7 @@ extern void url_Split(char *url, char **scheme, char **link, char **query)
 	// if(fragment) *fragment = found_fragment;
 
 	// if(found_scheme)   printf("url_Split() scheme=[%s]\n", found_scheme);
-	if(found_link)     printf("url_Split() link=[%s]\n", found_link);
+	// if(found_link)     printf("url_Split() link=[%s]\n", found_link);
 	// if(found_query)    printf("url_Split() query=[%s]\n", found_query);
 	// if(found_fragment) printf("url_Split() fragment=[%s]\n", found_fragment);
 
