@@ -12,22 +12,50 @@
 	One test is known to fail : "http://3279880203/blah" because canonicalization of IP address 
 	is currently not supported.
 
-	To compile : gcc test_url.c url.c -o test_url
+	To compile : gcc -std=c99 test_url.c url.c -o test_url
 */
 
 
-void TestCanonicalize(char *test_url, char *expected_result)
+void TestCanonicalize(char *url, char *expected_result)
 {
-	char *str = url_Canonicalize(test_url, 0, NULL);
+	char *str = url_Canonicalize(url, 0, NULL);
 	if(str==NULL) {
 		fprintf(stderr, "Error while canonicalizing URL\n");
 		exit(-1);
 	}
+
 	if(strcmp(expected_result, str))
-		printf(">>> FAILED [%s]>[%s] expected [%s]>\n", test_url, str, expected_result);
+		printf(">>> FAILED [%s]>[%s] expected [%s]>\n", url, str, expected_result);
 	else
-		printf("PASSED: [%s]>[%s]\n", test_url, str);
+		printf("PASSED: [%s]>[%s]\n", url, str);
+
 	free(str);
+
+
+	// Examples of other functions available :
+
+	// char *hostname = url_GetHostname(url);
+	// printf("Hostname = [%s]\n", hostname);
+	// free(hostname);
+	
+	// char *test_url = strdup(url);
+	// char *query = url_RemoveQuery(test_url, NULL);
+	// printf("url=[%s] query=[%s]\n", test_url, query);
+	// free(test_url);
+
+	// test_url = strdup(url);
+	// char *fragment = url_RemoveFragment(test_url, NULL);
+	// if(fragment)
+	// 	printf("url=[%s] fragment=[%s]\n", test_url, fragment);
+	// free(test_url);
+	
+	// long length;
+	// char *base = url_GetBase(url, 0, &length);
+	// printf("Initial url = [%s]\n", url);
+	// printf("Base = [%s] (%ld bytes)\n", base, length);
+	// free(base);
+
+
 }
 
 
@@ -48,7 +76,7 @@ int main(int argc, char *argv[])
 	TestCanonicalize("http://www.google.com/blah/..", "http://www.google.com/");
 	TestCanonicalize("www.google.com/", "http://www.google.com/");
 	TestCanonicalize("www.google.com", "http://www.google.com/");
-	TestCanonicalize("http://www.evil.com/blah#frag", "http://www.evil.com/blah");
+	TestCanonicalize("HTTP://www.evil.com/blah#frag", "http://www.evil.com/blah");
 	TestCanonicalize("http://www.GOOgle.com/", "http://www.google.com/");
 	TestCanonicalize("http://www.google.com.../", "http://www.google.com/");
 	TestCanonicalize("http://www.google.com/foo\tbar\rbaz\n2", "http://www.google.com/foobarbaz2");

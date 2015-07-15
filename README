@@ -1,28 +1,53 @@
-URL CANONICALIZATION
+URL CANONICALIZATION AND UTILITIES FUNCTIONS
 
-This is a set a C functions to manipulate URL strings and achieve URL
-Canonicalization as described by Google in its Safe Browsing developer's
-guide. See :
+This is a set a C functions to manipulate URL strings (in an RFC 3986 compliant
+way) and achieve URL Canonicalization as described by Google in its Safe 
+Browsing developer's guide. See :
 
 https://developers.google.com/safe-browsing/developers_guide_v3#Canonicalization
 
 It includes the following functions (see url.h for full documentation) :
 
-- url_RemoveTabCRLF() : remove leading and trailing spaces, as well as tab
+- url_RemoveTabCRLF() : removes leading and trailing spaces, as well as tab
   (0x09), CR (0x0d), and LF (0x0a) characters from the URL.
 
-- url_RemoveFragment() : Remove the fragment part of an URL.
+- url_RemoveFragment() : removes the fragment part of an URL.
 
-- url_Unescape() : Percent-decode an URL, calling itself until there is no 
+- url_RemoveQuery() : removes the query part of an URL.
+
+- url_Unescape() : percent-decode an URL, calling itself until there is no 
   more percent-decoding to be done.
 
-- url_Normalize() : Apply URL normalization rules as described in Google Safe
-  Borwsing Developer's Guide.
+- url_Normalize() : applies URL normalization rules as described in Google Safe
+  Browsing Developer's Guide.
 
-- url_Escape() : Percent-encode an URL.
+- url_Escape() : Percent-encode an URL. Reserved characters (from RFC 3986
+  that is one of "!*'();:@&=+$,/?#[]") are not encoded.
 
-- url_Canonicalize() : Canonicalize an URL by successvely calling all above
-  functions.
+- url_EscapeIncludingReservedChars() : Percent-encode a string, including
+  reserved characters.
+
+- url_Encode() : encodes a string to be compliant with 
+  application/x-www-form-urlencoded format. Same as 
+  url_EscapeIncludingReservedChars() but also replaces spaces with '+'.
+
+- url_Canonicalize() : canonicalizes an URL by successively calling 
+  url_Normalize(), then url_Escape() to get a percent-encoded url.
+
+- url_CanonicalizeWithFullEscape() : canonicalizes an URL (same as
+  url_Canonicalize()) but returned string is fully percent-encoded, even the
+  reserved characters.
+
+- url_ParseNextKeyValuePair() : allows parsing of a "key=value&key=value&..."
+  string.
+
+- url_Split() : splits an URL into its schme, link and query parts, as defined
+  by RFC3986.
+
+- url_GetHostname() : returns the hostname part extracted from an URL.
+
+- url_GetBase() : returns the base part of an URL.
+
 
 All these functions are supposed to be thread safe.
 
@@ -32,6 +57,6 @@ fail because canonicalization of IP addresses is currently not supported.
 In case the host name has been replaced by an IP address, the address will 
 simply be kept unchanged.
 
-To compile : gcc test_url.c url.c -o test_url
+To compile : gcc -std=c99 test_url.c url.c -o test_url
 Tu run tests : ./test_url
 
