@@ -5,12 +5,21 @@
  */
 
 
+#define _BSD_SOURCE
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdbool.h>
 #include <ctype.h>
+
+#ifdef __linux__
+	#include <bsd/stdlib.h>
+#endif
+
+#include "url.h"
+
 
 
 // Convert an hexadecimal character [0-9a-zA-Z] to it's integer value
@@ -20,7 +29,8 @@
 
 // Convert a "%AB" or "%ab" hexadecimal string to its integer value, or return -1 if was not an hex string
 static inline int url_DecodePercent(const char *s) {
-	if(	*s == '%'
+	if(	    s
+		&&  *s == '%'
 	  	&& 	((*(s+1)>='0' &&  *(s+1)<='9') || (*(s+1)>='A' &&  *(s+1)<='F') || (*(s+1)>='a' &&  *(s+1)<='f'))
 	  	&& 	((*(s+2)>='0' &&  *(s+2)<='9') || (*(s+2)>='A' &&  *(s+2)<='F') || (*(s+2)>='a' &&  *(s+2)<='f')) )
 		return(16*VAL(*(s+1)) + VAL(*(s+2)));	
@@ -32,7 +42,7 @@ static inline int url_DecodePercent(const char *s) {
 static char *url_RFC3986_ReservedChars = "!*'();:@&=+$,/?#[]";
 
 /**
- * Check is a given char is one of the RFC 3986 reserved characters,
+ * Check if a given char is one of the RFC 3986 reserved characters,
  * that is one of the following : "!*'();:@&=+$,/?#[]".	
  * @param  c Character to be checked.
  * @return   True if the given character is reserved, false otherwise.
@@ -56,14 +66,16 @@ static inline bool url_IsReserved(const char c)
  * allocated string.
  * @param  string  Pointer to string to be cleaned.
  * @param  len     Length of string. If 0, then strlen() will be called.
- * @param  new_len If not NULL, pointer to a long where the length of the
+ * @param  new_len If not NULL, pointer to a size_t where the length of the
  *                 new string will be stored.
  * @return         Pointer to a newly allocated string, must be freed using
  *                 free(), or NULL in case of error.
  */
-extern char *url_RemoveTabCRLF(const char *string, long len, long *new_len)
+extern char *url_RemoveTabCRLF(const char *string, size_t len, size_t *new_len)
 {
-	// printf("url_RemoveTabCRLF() [%s]\n", string);
+	if(string==NULL)
+		return(NULL);
+
 	if(len==0)
 		len=strlen(string);
 
@@ -109,17 +121,23 @@ extern char *url_RemoveTabCRLF(const char *string, long len, long *new_len)
  * to 'http://google.com/'. The initial string is changed by putting a NUL character
  * where the first '#' is found.
  * @param  string  Pointer to string holding the fragment.
- * @param  new_len If not NULL, pointer to a long where the length of the modified
+ * @param  new_len If not NULL, pointer to a size_t where the length of the modified
  *                 string will be stored.
  * @return         Pointer to the fragment string, or NULL.
  */
-extern char *url_RemoveFragment(char *string, long *new_len)
+extern char *url_RemoveFragment(char *string, size_t *new_len)
 {
+	if(string==NULL)
+		return(NULL);
+
 	char *p = string;
+	
 	for( ; *p && *p!='#'; p++)
 		;
+	
 	if(new_len)
 		*new_len = p - string;
+	
 	if(*p == '#') {
 		*p = '\0';
 		return(p+1);
@@ -132,17 +150,23 @@ extern char *url_RemoveFragment(char *string, long *new_len)
  * Remove the query part of an URL (part starting with ?). The initial
  * string is changed by putting a NUL character where the first '?' is found.
  * @param  string  Pointer to a string holding the URL.
- * @param  new_len Pointer to long. If not NULL, will be loaded with
+ * @param  new_len Pointer to size_t. If not NULL, will be loaded with
  *                 the new length of the shortened URL.
  * @return         Pointer to query part if found, or NULL.
  */
-extern char *url_RemoveQuery(char *string, long *new_len)
+extern char *url_RemoveQuery(char *string, size_t *new_len)
 {
+	if(string==NULL)
+		return(NULL);	
+
 	char *p = string;
+	
 	for( ; *p && *p!='?'; p++)
 		;
+	
 	if(new_len)
 		*new_len = p - string;
+	
 	if(*p == '?') {
 		*p = '\0';
 		return(p+1);
@@ -152,19 +176,20 @@ extern char *url_RemoveQuery(char *string, long *new_len)
 
 
 /**
- * Percent-decode a string, calling itself until all percend-decoding is done.
+ * Percent-decode a string, calling itself until all percent-decoding is done.
  * Returned string is stored in a newly allocated buffer that needs to be freed.
  * @param  string  Pointer to string to be decoded.
  * @param  len     Length of string or 0. If len is 0, strlen() will be called.
- * @param  new_len Pointer to a long where to store length of the decoded string.
+ * @param  new_len Pointer to a size_t where to store length of the decoded string.
  *                 Can be NULL if you don't need the length of the returned string.
  * @return         Pointer to a newly allocated decoded string. Needs to be freed
  *                 with free(). NULL if error.
  */
-extern inline char *url_Unescape(const char *string, long len, long *new_len)
+extern inline char *url_Unescape(const char *string, size_t len, size_t *new_len)
 {
 
-	// printf("Unescape() begin [%s] [%ld] [%ld]\n", string, len, (new_len ? *new_len : -1));
+	if(string==NULL)
+		return(NULL);
 
 	if(len==0)
 		len=strlen(string);
@@ -187,7 +212,7 @@ extern inline char *url_Unescape(const char *string, long len, long *new_len)
 	}
 	*decoded_string = '\0';	
 
-	long decoded_string_length = decoded_string - begin_decoded;
+	size_t decoded_string_length = decoded_string - begin_decoded;
 	if(decoded_string_length == len) {
 		// No more unescape() needed
 		if(new_len)
@@ -211,62 +236,80 @@ extern inline char *url_Unescape(const char *string, long len, long *new_len)
  * that we don't do any normalization if the hostname is replaced by an IP address.
  * @param  src     Pointer to string holding the URL to be normalized.
  * @param  len     Length of source string. If 0, strlen() will be called.
- * @param  new_len If not NULL, pointer to a long where the length of the new string will be stored.
+ * @param  new_len If not NULL, pointer to a size_t where the length of the new string will be stored.
  * @return         Pointer to a newly allocated string. Must freed using free(). Or
  *                 NULL of error.
  */
-extern char *url_Normalize(const char *src, const long len, long *new_len)
+extern char *url_Normalize(const char *src, const size_t len, size_t *new_len)
 {
-	long tmp;
+	if(src==NULL)
+		return(NULL);
+
+	size_t tmp;
 
 	if(new_len == NULL)
 		new_len = &tmp;
 
-	// printf("url_Normalize() [%s]\n", src);
+// printf("url_Normalize() [%s]\n", src);
 
 	char *str1 = url_RemoveTabCRLF(src, len, new_len);
-	// printf("%-16s = [%s]\n", "CLEANED", str1);
-	// printf("new_len = %ld\n", *new_len);
+	if(str1==NULL)
+		return(NULL);
+// printf("%-16s = [%s]\n", "CLEANED", str1);
+// printf("new_len = %ld\n", *new_len);
 	url_RemoveFragment(str1, new_len);
-	// printf("%-16s = [%s]\n", "FRAGMENT REMOVED", str1);
-	// printf("new_len = %ld\n", *new_len);	
+// printf("%-16s = [%s]\n", "FRAGMENT REMOVED", str1);
+// printf("new_len = %ld\n", *new_len);	
 	char *str2 = url_Unescape(str1, *new_len, new_len);
-	// printf("%-16s = [%s]\n", "UNESCAPED", str2);
-	// printf("new_len = %ld\n", *new_len);		
+	if(str2==NULL) {
+		free(str1);
+		return(NULL);
+	}
+// printf("%-16s = [%s]\n", "UNESCAPED", str2);
+// printf("new_len = %ld\n", *new_len);		
 
 	// Save begining of source string
 	char *begin_source = str2;
 
 	// Destination string cannot be longer that the initial string + "http://" + trailing '/'
-	char *dest = malloc(*new_len+1+8);
+	char *dest = malloc(*new_len+1+8+12);
 	if(dest==NULL)
 		return(NULL);
 
 	// Save the beginning of the destination string
 	char *begin_dest = dest;
 
-	// Copy the scheme part
-	for( ; *str2 && *str2!=':'; dest++, str2++)
-		*dest = LOWERCASE(*str2);
-
-	if(*str2=='\0') {
-		// There is no scheme part, use "http" as default
+	// Look for end of scheme
+	char *end_of_scheme = begin_source;
+	for( ; *end_of_scheme!='\0' && *end_of_scheme!=':'; end_of_scheme++)
+		;
+	if(*end_of_scheme==':' && *(end_of_scheme+1)=='/' && *(end_of_scheme+2)=='/') {
+		// Copy the scheme part
+		for( ; *str2 && *str2!=':'; dest++, str2++)
+			*dest = LOWERCASE(*str2);
+		if( *(str2)==':' && *(str2+1)=='/' && *(str2+2)=='/') {
+			// Copy the "://" part
+			*(dest++) = *(str2++); *(dest++) = *(str2++); *(dest++) = *(str2++);
+		} else {
+			goto bad;
+		}
+	} else { 
+		// No scheme part, use "http" as default
 		str2 = begin_source;
 		dest = begin_dest;
 		strcpy(dest, "http://");
 		dest +=7;	
-	} else if( *(str2)==':' && *(str2+1)=='/' && *(str2+2)=='/') {
-		// Copy the "://" part
-		*(dest++) = *(str2++); *(dest++) = *(str2++); *(dest++) = *(str2++);
-	} else
-		goto bad;
+	}
 
-	// Find the next '/' so we can have the beginning and the end of the host name
+	// Skip leading '/' if any
+	for( ; *str2=='/'; str2++)
+		;
+
+	// Find end of the host name
 	char *begin_hostname = str2;
-	while(*str2 && *str2!='/')
+	while(*str2 && *str2!='/' && *str2!='?')
 		str2++;
-	str2--;
-	char *end_hostname = str2;
+	char *end_hostname = str2-1;
 
 	// Ignore leading dots
 	while(*begin_hostname && *begin_hostname=='.')
@@ -282,13 +325,14 @@ extern char *url_Normalize(const char *src, const long len, long *new_len)
 	for( ; end_hostname-begin_hostname>=0; dest++, begin_hostname++)
 		*dest = LOWERCASE(*begin_hostname);
 
-	str2++;
-	*(dest++)='/';
+	// str2++;
+	if(*(dest-1)!='/')
+		*(dest++)='/';
 
-	if(*str2!='/') {
-		*dest = '\0';
-		goto good;
-	}
+	// if(*str2!='/') { 
+	// 	*dest = '\0';
+	// 	goto good;
+	// }
 
 	char *after_hostname = dest;
 
@@ -309,12 +353,14 @@ extern char *url_Normalize(const char *src, const long len, long *new_len)
 					if(*(str2+1)=='.' && *(str2+2)=='/') {
 						// replace "/./" with "/"
 						*(dest++) = '/';
-						str2 +=3;
+						str2 +=2;
 					} else if(*(str2+1)=='.' && *(str2+2)=='.' && (*(str2+3)=='/' || *(str2+3)=='\0')) {
 						// Remove "/../" along with the preceding path component.
 						if(*(str2+3)=='\0')
 							str2 +=3;
-						else str2 +=4;
+						else str2 +=3;
+						if(*(dest-1)=='/')
+							dest--;
 						do {
 							dest--;
 						} while(dest-after_hostname>=0 && *dest!='/');
@@ -329,20 +375,24 @@ extern char *url_Normalize(const char *src, const long len, long *new_len)
 					*(dest++) = *(str2++);
 			}
 		}
+// printf("%.*s\n", (int)(dest-begin_dest), begin_dest);
 	}
 	*dest='\0';
 
-good:
+// good:
 	free(str1); free(begin_source);
 	if(new_len)
 		*new_len = dest - begin_dest;
-	// printf("url_Normalize() END dest=[%s] len=%ld\n", begin_dest, dest-begin_dest);
+// printf("url_Normalize() END dest=[%s] len=%ld\n", begin_dest, dest-begin_dest);
 	return(begin_dest);
 
 bad:
-	free(str1); free(begin_source);
-	if(dest)
-		free(dest);
+// printf("This is bad\n");
+	free(str1); 
+	free(begin_source);
+	if(begin_dest) {
+		free(begin_dest);
+	}
 	return(NULL);
 }
 
@@ -353,12 +403,15 @@ bad:
  * encoded.
  * @param  src     Pointer to source string to be percent-encoded.
  * @param  len     Length of source string. If 0, strlen() will be used.
- * @param  new_len If not NULL, pointer to a long where the length of the new string will be stored.
+ * @param  new_len If not NULL, pointer to a size_t where the length of the new string will be stored.
  * @return         Pointer to newly allocated string. Must be freed with free().
  *                 Or NULL if error.
  */
-extern char *url_Escape(const char *src, long len, long *new_len)
+extern char *url_Escape(const char *src, size_t len, size_t *new_len)
 {
+	if(src==NULL)
+		return(NULL);
+
 	const unsigned char *usrc = (unsigned char *)src;
 	if(len==0)
 		len = strlen(src);
@@ -392,12 +445,15 @@ extern char *url_Escape(const char *src, long len, long *new_len)
  * newly allocated buffer of NULL if error. 
  * @param  src     Pointer to source string to be percent-encoded.
  * @param  len     Length of source string. If 0, strlen() will be used.
- * @param  new_len If not NULL, pointer to a long where the length of the new string will be stored.
+ * @param  new_len If not NULL, pointer to a size_t where the length of the new string will be stored.
  * @return         Pointer to newly allocated string. Must be freed with free().
  *                 Or NULL if error.
  */
-extern char *url_EscapeIncludingReservedChars(const char *src, long len, long *new_len)
+extern char *url_EscapeIncludingReservedChars(const char *src, size_t len, size_t *new_len)
 {
+	if(src==NULL)
+		return(NULL);
+
 	const unsigned char *usrc = (unsigned char *)src;
 	if(len==0)
 		len = strlen(src);
@@ -433,23 +489,23 @@ extern char *url_EscapeIncludingReservedChars(const char *src, long len, long *n
  * Return canonicalized URL is a newly allocated buffer, or NULL if error.
  * @param  src     Pointer to source string holding the URL to be canonicalized.
  * @param  len     Length of source string. If 0, strlen() will be used.
- * @param  new_len If not NULL, pointer to a long where the length of the new string will be stored.
+ * @param  new_len If not NULL, pointer to a size_t where the length of the new string will be stored.
  * @return         Pointer to newly allocated string holding the canonicalized URL,
  *                 or NULL if error. Must be freed with free().
  */
-extern char *url_Canonicalize(const char *src, long len, long *new_len)
+extern char *url_Canonicalize(const char *src, size_t len, size_t *new_len)
 {
-	long tmp;
-	// printf("%-16s = [%s]\n", "SRC", src);
+	if(src==NULL)
+		return(NULL);
+
+	size_t tmp;
 	if(new_len == NULL)
 		new_len = &tmp;
 	
 	char *str3 = url_Normalize(src, len, new_len);
-	// printf("%-16s = [%s]\n", "NORMALIZED", str3);
-	// printf("new_len = %ld\n", *new_len);	
+	if(str3==NULL)
+		return(NULL);
 	char *str4 = url_Escape(str3, *new_len, new_len);
-	// printf("%-16s = [%s]\n", "ESCAPED", str4);
-	// printf("new_len = %ld\n", *new_len);		
 
 	free(str3);
 	return(str4);
@@ -464,33 +520,24 @@ extern char *url_Canonicalize(const char *src, long len, long *new_len)
  * Return canonicalized URL is a newly allocated buffer, or NULL if error.
  * @param  src     Pointer to source string holding the URL to be canonicalized.
  * @param  len     Length of source string. If 0, strlen() will be used.
- * @param  new_len If not NULL, pointer to a long where the length of the new string will be stored.
+ * @param  new_len If not NULL, pointer to a size_t where the length of the new string will be stored.
  * @return         Pointer to newly allocated string holding the canonicalized URL,
  *                 or NULL if error. Must be freed with free().
  */
-extern char *url_CanonicalizeWithFullEscape(const char *src, long len, long *new_len)
+extern char *url_CanonicalizeWithFullEscape(const char *src, size_t len, size_t *new_len)
 {
-	long tmp;
-	// printf("%-16s = [%s]\n", "SRC", src);
+	if(src==NULL)
+		return(NULL);
+
+	size_t tmp;
 	if(new_len == NULL)
 		new_len = &tmp;
-	// char *str1 = url_RemoveTabCRLF(src, len, new_len);
-	// printf("%-16s = [%s]\n", "CLEANED", str1);
-	// printf("new_len = %ld\n", *new_len);
-	// url_RemoveFragment(str1, new_len);
-	// printf("%-16s = [%s]\n", "FRAGMENT REMOVED", str1);
-	// printf("new_len = %ld\n", *new_len);	
-	// char *str2 = url_Unescape(str1, *new_len, new_len);
-	// printf("%-16s = [%s]\n", "UNESCAPED", str2);
-	// printf("new_len = %ld\n", *new_len);		
+
 	char *str3 = url_Normalize(src, len, new_len);
-	// printf("%-16s = [%s]\n", "NORMALIZED", str3);
-	// printf("new_len = %ld\n", *new_len);	
+	if(str3==NULL)
+		return(NULL);
 	char *str4 = url_EscapeIncludingReservedChars(str3, *new_len, new_len);
-	// printf("%-16s = [%s]\n", "ESCAPED", str4);
-	// printf("new_len = %ld\n", *new_len);		
-	// free(str1);
-	// free(str2);
+
 	free(str3);
 	return(str4);
 }
@@ -500,20 +547,24 @@ extern char *url_CanonicalizeWithFullEscape(const char *src, long len, long *new
 /**
  * Encode a string to be compliant with application/x-www-form-urlencoded format.
  * It is the same as url_EscapeIncludingReservedChars() but it also replaces 
- * spaces with '+'.
+ * spaces with '+'. (NOTE & WARNING: THIS CODE IS OBVIOUSLY WRONG AS 32 AND ' '
+ * ARE ACTUALLY THE SAME SPACE CHARACTER !!)
  * @param  src     Pointer to string to be encoded.
  * @param  len     Length of string. If 0, strlen() will be used.
- * @param  new_len If not NULL, pointer to a long where the length of the 
+ * @param  new_len If not NULL, pointer to a size_t where the length of the 
  *                 encoded string will be stored.
  * @return         Pointer to newly allocated string holding 
  *                 or NULL if error. Must be freed with free().
  */
-extern char *url_Encode(const char *src, long len, long *new_len)
+extern char *url_Encode(const char *src, size_t len, size_t *new_len)
 {
+	if(src==NULL)
+		return(NULL);
+
 	if(len==0)
 		len = strlen(src);
 
-	long length;
+	size_t length;
 
 	// make sure URL is clean
 	char *str = url_Unescape(src, len, &length);
@@ -521,8 +572,10 @@ extern char *url_Encode(const char *src, long len, long *new_len)
 		return(NULL);
 
 	char *dest = malloc(3*length+1);
-	if(dest==NULL)
+	if(dest==NULL) {
+		free(str);
 		return(NULL);
+	}
 	char *begin_dest = dest;
 
 	unsigned char *usrc = (unsigned char *)str;
@@ -531,6 +584,8 @@ extern char *url_Encode(const char *src, long len, long *new_len)
 			sprintf(dest, "%%%02X", *(usrc++));
 			dest +=3;
 		} else if(*usrc==' ') {
+			// (NOTE & WARNING: THIS CODE IS OBVIOUSLY WRONG AS 32 AND ' '
+ 			// ARE ACTUALLY THE SAME SPACE CHARACTER !!
 			*(dest++) = '+';
 			usrc++;
 		} else {
@@ -548,33 +603,47 @@ extern char *url_Encode(const char *src, long len, long *new_len)
 }
 
 
+inline static bool url_IsSeparator(char c, const char *separators_list)
+{
+	const char *separators = separators_list ? separators_list : "&;";
+	for(; *separators; separators++) {
+		if(*separators == c)
+			return(true);
+	}
+	return(false);
+}
+
 /**
- * Parse a "key=value&key=value&key=value" string. The semicolon character (';') is
- * also an acceptable separator in lieu of "&".	The original string is modified :
- * '=', '&' and ';' characters are replaced by NUL. Each call return to next key-value
- * pair, as well as a pointer where the newt parsing has to be made. If the value part
+ * Parse a "key=value&key=value&key=value" string. You can use the default separator
+ * characters (';' and '&') or provide your own list of separator characters. 
+ * Note that the original string is modified : '=', and separator characters 
+ * are replaced by the NUL character. Each call return to next key-value
+ * pair, as well as a pointer to where the next parsing has to be made. If the value part
  * was between double-quotes, those will be removed. If one part of the pair is missing,
- * the value found will be resturned as key. For example, when calling this function
+ * the value found will be returned as key. For example, when calling this function
  * with the string "0;URL=http://verifrom.com", the first call will returned "0" as key,
  * and NULL as value. The second call will return "URL" as key and "http://verifrom.com"
  * as value.
- * @param  string       String to be parsed.
- * @param  key_string   Pointer to a string pointer. Will be loaded with a pointer to
- *                      the beginning of the key-string in the initial string. Will be
- *                      NULL if no value found.
- * @param  value_string Pointer to a string pointer. Will be loaded with a pointer to
- *                      the beginning of the key-value in the initial string. Will be
- *                      NULL if no value found.
- * @return              Pointer to the remainder of the initial string to be parsed,
- *                      or NULL if there is nothing left to be parsed.
+ * @param  string          String to be parsed.
+ * @param  key_string      Pointer to a string pointer. Will be loaded with a pointer to
+ *                         the beginning of the key-string in the initial string. Will be
+ *                         NULL if no value found.
+ * @param  value_string    Pointer to a string pointer. Will be loaded with a pointer to
+ *                         the beginning of the key-value in the initial string. Will be
+ *                         NULL if no value found.
+ * @param  separators_list String made of the separator characters you want to use, or NULL.
+ 	                       If NULL, the dfault list ";&" is used.
+ * @return                 Pointer to the remainder of the initial string to be parsed,
+ *                         or NULL if there is nothing left to be parsed.
  */
-extern char *url_ParseNextKeyValuePair(char *string, char **key_string, char **value_string)
+extern char *url_ParseNextKeyValuePair(char *string, char **key_string, char **value_string, const char *separators_list)
 {
-    if(string==NULL || key_string==NULL || value_string==NULL) {
-        // print_log(LOG_ERR, __FILE__, __LINE__, "common_ParseNextKeyValuePair() wrong arguments");
+    if(string==NULL || key_string==NULL || value_string==NULL)
         return(NULL);
-    }
 
+    if(separators_list==NULL)
+    	separators_list = "&;";
+ 
     // for now, we found nothing
     *key_string = NULL;
     *value_string = NULL;
@@ -595,7 +664,8 @@ extern char *url_ParseNextKeyValuePair(char *string, char **key_string, char **v
 
     // accept all characters up to blanks or = or NUL or & OR ;
     ix++;
-    while(string[ix]!=0 && (isalnum(string[ix])||string[ix]=='-'||string[ix]=='_') && string[ix]!=';' && string[ix]!='&')
+    // while(string[ix]!=0 && (isalnum(string[ix])||string[ix]=='-'||string[ix]=='_') && string[ix]!=';' && string[ix]!='&')
+    while(string[ix]!=0 && (isalnum(string[ix])||string[ix]=='-'||string[ix]=='_') && !url_IsSeparator(string[ix], separators_list))
         ix++;   
 
     // if we reached the end of string, we must stop here
@@ -605,13 +675,15 @@ extern char *url_ParseNextKeyValuePair(char *string, char **key_string, char **v
     char *end_of_key_string = string+ix;
 
     // Look for a =
-    while(string[ix]!=0 && string[ix]!='=' && string[ix]!='&' && string[ix]!=';')
+    // while(string[ix]!=0 && string[ix]!='=' && string[ix]!='&' && string[ix]!=';')
+    while(string[ix]!=0 && string[ix]!='=' && !url_IsSeparator(string[ix], separators_list))
         ix++;
 
     if(string[ix]==0) 
         return(NULL);
 
-    if(string[ix]=='&' || string[ix]==';') {
+    // if(string[ix]=='&' || string[ix]==';') {
+    if(url_IsSeparator(string[ix], separators_list)) {
     	(*end_of_key_string) = 0;
     	return(string[ix+1] ? string+ix+1 : NULL);
     }
@@ -620,22 +692,31 @@ extern char *url_ParseNextKeyValuePair(char *string, char **key_string, char **v
 
     // Now we need to find the beginning of our value_string
     ix++;
-    // while(string[ix]!=0 && !(string[ix]>=0x21 && string[ix]<=0x7E))
-    //     ix++;       
+
+    // Strip blanks
+    while(string[ix]!=0 && string[ix]<=0x20)
+        ix++;       
 
     if(string[ix]==0) return(NULL);
 
-    bool quoted_string = (string[ix]=='"');
+    // This is a special case if key=="URL". In that case,
+    // we will read up to the end of string to load the value
+    if(strcasecmp(*key_string, "url") == 0)
+    	separators_list = "";
+
+    bool quoted_string = (string[ix]=='"' || string[ix]=='\'');
+    char quote_char = quoted_string ? string[ix] : '\0';
 
     if(quoted_string) {
         ix++;
         (*value_string) = string+ix;
-        while(string[ix]!=0 && string[ix]!='"')
+        while(string[ix]!=0 && string[ix]!=quote_char)
             ix++;
     } else {
         (*value_string) = string+ix;
         ix++;
-        while(string[ix]!=0 && string[ix]!='&' && string[ix]!=';')
+        // while(string[ix]!=0 && string[ix]!=';')
+        while(string[ix]!=0 && !url_IsSeparator(string[ix], separators_list))
             ix++;
     }
 
@@ -663,10 +744,8 @@ extern char *url_ParseNextKeyValuePair(char *string, char **key_string, char **v
  */
 extern void url_Split(char *url, char **scheme, char **link, char **query)
 {
-	if(url==NULL) {
-		fprintf(stderr, "url_Split() invalid argument");
+	if(url==NULL)
 		return;
-	}
 
 	char *found_scheme=NULL, *found_link=NULL, *found_query=NULL;
 	int pos=0;
@@ -732,7 +811,6 @@ extern char *url_GetHostname(const char *url)
 	char *clean = url_Normalize(url, 0, NULL);
 	if(clean==NULL)
 		return(NULL);
-	// printf("url_GetHostname() clean=[%s]\n", clean);
 
 	// Find the link part of the url
 	char *link;
@@ -747,18 +825,20 @@ extern char *url_GetHostname(const char *url)
 	// Skip leading '//'
 	link +=2;
 
+	// Skip leading "www." if any
+	if(link[0]=='w' && link[1]=='w' && link[2]=='w' && link[3]=='.')
+		link +=4;
+
 	// Find the end of the hostname in link, that
-	// is the firt '/' we meet.
+	// is the first '/' or ':' we meet.
  	for(char *p=link; *p; p++)
-		if(*p == '/') {
+		if(*p=='/' || *p==':') {
 			*p = '\0';
 			break;
 		}
-	// printf("url_GetHostname() link=[%s]\n", link);
 
 	// Make a copy of the hostname
 	char *hostname = url_Encode(link, 0, NULL);
-	// printf("url_GetHostname() hostname=[%s]\n", hostname);
 
 	// Free the cleaned url we created
 	free(clean);
@@ -769,21 +849,82 @@ extern char *url_GetHostname(const char *url)
 }
 
 
+
+
+/**
+ * Return the hostname part extracted from an url in a newly allocated string,
+ * without skiping the www. header.
+ * @param  url     Pointer to an URL.
+ * @return         Pointer to a newly allocated string holding the hostname
+ *                 extracted from the URL. Use free() to deallocate the memory.
+ */
+extern char *url_GetHostnameWWW(const char *url)
+{
+	// Make sure we have an url
+	if(url==NULL)
+		return(NULL);
+
+	// Make sure we have a normalized url
+	char *clean = url_Normalize(url, 0, NULL);
+	if(clean==NULL)
+		return(NULL);
+
+	// Find the link part of the url
+	char *link;
+	url_Split(clean, NULL, &link, NULL);
+
+	if(link==NULL) {
+		fprintf(stderr, "url_GetHostname() cannot find link part in URL [%s]\n", url);
+		free(clean);
+		return(NULL);
+	}
+
+	// Skip leading '//'
+	link +=2;
+
+	// Skip leading "www." if any
+	// if(link[0]=='w' && link[1]=='w' && link[2]=='w' && link[3]=='.')
+	// 	link +=4;
+
+	// Find the end of the hostname in link, that
+	// is the first '/' or ':' we meet.
+ 	for(char *p=link; *p; p++)
+		if(*p=='/' || *p==':') {
+			*p = '\0';
+			break;
+		}
+
+	// Make a copy of the hostname
+	char *hostname = url_Encode(link, 0, NULL);
+
+	// Free the cleaned url we created
+	free(clean);
+
+	// Return hostname
+	return(hostname);
+
+}
+
+
+
 /**
  * Return the base part of an URL in a newly allocated string.
  * @param  url     Pointer to string holding the URL.
  * @param  len     Length of URL, strlen() will be used if 0.
- * @param  new_len If not NULL, pointer to a long where the length of the new
+ * @param  new_len If not NULL, pointer to a size_t where the length of the new
  *                 string will be stored.
  * @return         Pointer to a newly allocated string holding the
  *                 base part of the initial URL.
  */
-extern char *url_GetBase(const char *url, long len, long *new_len)
+extern char *url_GetBase(const char *url, size_t len, size_t *new_len)
 {
+	if(url==NULL)
+		return(NULL);
+
 	if(len == 0)
 		len = strlen(url);
 
-	long tmp=0;
+	size_t tmp=0;
 	if(new_len == NULL)
 		new_len = &tmp;
 
@@ -802,3 +943,177 @@ extern char *url_GetBase(const char *url, long len, long *new_len)
 
 	return(str);
 }
+
+
+/**
+ * Return the scheme part of an URL in a newly allocated string
+ * @param  url Pointer to string holding the URL.
+ * @return     Pointer to a newly allocated string holding the
+ *             scheme part of the initial URL.
+ */
+extern char *url_GetScheme(const char *url)
+{
+	if(url==NULL)
+		return(NULL);
+
+	char *ptr = strstr(url, "://");
+	if(ptr==NULL)
+		return(NULL); 
+	size_t scheme_length = ptr - url + 3;
+	char *scheme = malloc(scheme_length + 1);
+	if(scheme) {
+		memcpy(scheme, url, scheme_length);
+		scheme[scheme_length] = '\0';
+	}
+	return(scheme);
+}
+
+
+
+/**
+ * Test if a given URL is absolute (ie. starting with http:// or https://).
+ * @param  url URL to be tested.
+ * @return     true if the URL is absolute, or false.
+ */
+extern bool url_IsAbsolute(const char *url)
+{
+	if(url==NULL)
+		return(false);
+
+	return(
+		strncasecmp(url, "http://", 7)==0 || strncasecmp(url, "https://", 8)==0
+		? true
+		: false
+	);
+}
+
+
+/**
+ * Make an absolute URL in a newly allocated memory string. If the given
+ * URL is already absolute, a simple copy is made.
+ * @param  parent_url Parent URL from which the "absolute" part will be
+ *                    extracted. Must be absolute, obviously. Must be
+ *                    unescaped.
+ * @param  url        Absolute or relative URL from which an absolute one
+ *                    must be built. The "absolute" is built based on the
+ *                    given parent_url. Must be unescaped.
+ * @return            Newly allocated string holding the absolute url for
+ *                    the given URL, or NULL if error.
+ */
+extern char *url_MakeAbsolute(const char *parent_url, const char *url)
+{
+	// Check arguments
+	if(parent_url==NULL || url==NULL)
+		return(NULL);
+
+	// Save fragment if any
+	char *fragment = url_GetFragment(url);
+
+	size_t normalized_url_len = 0;
+	char *normalized_url = NULL;
+
+	if(url_IsAbsolute(url)) {
+
+		// Case where the relative URL is actually an absolute URL.
+		// Normalize to manage possible /./, // or /../ in path.
+		normalized_url = url_Normalize(url, strlen(url), &normalized_url_len);
+
+	} else {
+
+		// Build absolute URL without fragment
+		size_t base_url_len=0;
+		char *base_url = url_GetBase(parent_url, 0, &base_url_len);
+		char *absolute_url = malloc(base_url_len + strlen(url) + 1);
+		if(url[0]=='/' && url[1]=='/') {
+			char *scheme = url_GetScheme(parent_url);
+			sprintf(absolute_url, "%s%s", scheme?scheme:"", url+2);
+			free(scheme);
+		} else if(url[0]=='/') {
+			char *scheme = url_GetScheme(parent_url);
+			char *hostname = url_GetHostnameWWW(parent_url);
+			sprintf(absolute_url, "%s%s%s", scheme?scheme:"", hostname?hostname:"", url);
+			free(scheme);
+			free(hostname);
+		} else
+			sprintf(absolute_url, "%s%s", base_url, url);
+		free(base_url);
+
+		// Normalize to manage possible /./, // or /../ in path.
+		normalized_url = url_Normalize(absolute_url, strlen(absolute_url), &normalized_url_len);
+		free(absolute_url);
+
+	}
+
+	// Restore saved fragment
+	if(fragment) {
+		char *absolute_url = malloc(normalized_url_len + strlen(fragment) + 2);
+		sprintf(absolute_url, "%s#%s", normalized_url, fragment);
+		free(fragment);
+		free(normalized_url);
+		return(absolute_url);
+	} else {
+		return(normalized_url);
+	}
+	
+}
+
+
+
+/**
+ * Skip the scheme part of an URL. Return pointer to first
+ * character in the URL after the scheme part, or pointer to
+ * first character in URL if no scheme found.
+ * @param  url Pointer to string holding the URL.
+ * @return     Pointer to first character in the URL after the
+ *             scheme part, or pointer to first character in 
+ *             URL if no scheme part found.
+ */
+extern const char *url_SkipScheme(const char *url)
+{
+	if(url==NULL)
+		return(NULL);	
+	char *p = strstr(url, "://");
+	return( p ? p+3 : url);
+}
+
+
+/**
+ * Skip the wwww. part of a scheme less URL.
+ * @param  url_schemeless Pointer to a scheme less URL
+ * @return                Pointer into url_schemless where
+ *                        the "www." part ends.
+ */
+extern const char *url_SkipWWW(const char *url_schemeless)
+{
+	if(url_schemeless==NULL)
+		return(NULL);
+	if(url_schemeless[0]=='w' && url_schemeless[1]=='w' && url_schemeless[2]=='w' && url_schemeless[3]=='.')
+		return(url_schemeless+4);
+	else
+		return(url_schemeless);
+}
+
+
+
+/**
+ * Get fragment of an unescaped URL in a newly allocated string.
+ * @param  url Pointer to unescaped URL.
+ * @return     Pointer to fragment part of the URL in a newly allocated
+ *             buffer, or NULL if none found. The returned buffer
+ *             must be free()
+ */
+extern char *url_GetFragment(const char *url)
+{
+	if(url==NULL)
+		return(NULL);
+	for( ; *url && *url!='#'; url++)
+		;
+	if(*url == '#')
+		return(strdup(url+1));
+	else
+		return(NULL);
+}
+
+
+
+
