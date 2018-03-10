@@ -13,6 +13,7 @@
 #include <strings.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <netinet/in.h>
 
 #ifdef __linux__
 	#include <bsd/stdlib.h>
@@ -228,12 +229,12 @@ extern inline char *url_Unescape(const char *string, size_t len, size_t *new_len
 }
 
 
+
 /**
  * Normalize an URL. The URL will be cleaned with url_RemoveTabCRLF(), then its 
  * fragment will be removed with url_RemoveFragment(). The URL will be unescaped
  * with url_Unescape() before being normalizes. Return a normalized URL in a 
- * newly allocated block of memory or NULL if error. WARNING : current limitation is 
- * that we don't do any normalization if the hostname is replaced by an IP address.
+ * newly allocated block of memory or NULL if error. 
  * @param  src     Pointer to string holding the URL to be normalized.
  * @param  len     Length of source string. If 0, strlen() will be called.
  * @param  new_len If not NULL, pointer to a size_t where the length of the new string will be stored.
@@ -255,6 +256,10 @@ extern char *url_Normalize(const char *src, const size_t len, size_t *new_len)
 	char *str1 = url_RemoveTabCRLF(src, len, new_len);
 	if(str1==NULL)
 		return(NULL);
+	if(strlen(str1) == 0) {
+		free(str1);
+		return(NULL);
+	}
 // printf("%-16s = [%s]\n", "CLEANED", str1);
 // printf("new_len = %ld\n", *new_len);
 	url_RemoveFragment(str1, new_len);
@@ -272,7 +277,8 @@ extern char *url_Normalize(const char *src, const size_t len, size_t *new_len)
 	char *begin_source = str2;
 
 	// Destination string cannot be longer that the initial string + "http://" + trailing '/'
-	char *dest = malloc(*new_len+1+8+12);
+	// Add 15 bytes in case the hostname is an int to be converted in an IPv4 address
+	char *dest = malloc(*new_len+1+8+12+15);
 	if(dest==NULL)
 		return(NULL);
 
@@ -319,11 +325,26 @@ extern char *url_Normalize(const char *src, const size_t len, size_t *new_len)
 	while(end_hostname-begin_hostname>0 && *end_hostname=='.')
 		end_hostname--;
 
-	// We should normalize the IP addresse, but we expect the IP address to be a 4 dot-separated decimal values
-	
-	// Copy the host name, making sure all characters are lowercase
-	for( ; end_hostname-begin_hostname>=0; dest++, begin_hostname++)
-		*dest = LOWERCASE(*begin_hostname);
+	// Check if hostname is only made of digits
+	char *s1 = begin_hostname, *s2 = end_hostname;
+	bool hostname_is_number = true;
+	for( ; s2-s1>=0; s1++) {
+		if( *s1 < '0' || *s1 > '9' ) {
+			hostname_is_number = false;
+			break;
+		}
+	}
+
+	if(hostname_is_number) {
+		// If hostname is only made of digits, convert to an IP address
+		unsigned long ip_addr = htonl(strtoul(begin_hostname, NULL, 10));
+		unsigned char *p = (unsigned char *)(&ip_addr);
+		dest += sprintf(dest, "%u.%u.%u.%u", *p, *(p+1), *(p+2), *(p+3));
+	} else {
+		// Else copy the host name, making sure all characters are lowercase
+		for( ; end_hostname-begin_hostname>=0; dest++, begin_hostname++)
+			*dest = LOWERCASE(*begin_hostname);
+	}
 
 	// str2++;
 	if(*(dest-1)!='/')
@@ -484,8 +505,7 @@ extern char *url_EscapeIncludingReservedChars(const char *src, size_t len, size_
 /**
  * Canonicalize an URL as described in 
  * https://developers.google.com/safe-browsing/developers_guide_v3#Canonicalization.
- * Current limitation : no canonicalization of IP address is made. Reserved
- * characters "!*'();:@&=+$,/?#[]" are not encoded.
+ * Reserved characters "!*'();:@&=+$,/?#[]" are not encoded.
  * Return canonicalized URL is a newly allocated buffer, or NULL if error.
  * @param  src     Pointer to source string holding the URL to be canonicalized.
  * @param  len     Length of source string. If 0, strlen() will be used.
@@ -515,8 +535,7 @@ extern char *url_Canonicalize(const char *src, size_t len, size_t *new_len)
 /**
  * Canonicalize an URL as described in 
  * https://developers.google.com/safe-browsing/developers_guide_v3#Canonicalization.
- * Current limitation : no canonicalization of IP address is made. Reserved
- * characters "!*'();:@&=+$,/?#[]" ARE encoded.
+ * Reserved characters "!*'();:@&=+$,/?#[]" ARE encoded.
  * Return canonicalized URL is a newly allocated buffer, or NULL if error.
  * @param  src     Pointer to source string holding the URL to be canonicalized.
  * @param  len     Length of source string. If 0, strlen() will be used.

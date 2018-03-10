@@ -51,8 +51,7 @@ extern char *url_Unescape(const char *string, size_t len, size_t *new_len);
  * Normalize an URL. The URL will be cleaned with url_RemoveTabCRLF(), then its 
  * fragments will be removed with url_RemoveFragment(). The URL will be unescaped
  * with url_Unescape() before being normalizes. Return a normalized URL in a 
- * newly allocated block of memory or NULL if error. WARNING : current limitation is 
- * that we don't do any normalization if the hostname is replaced by an IP address.
+ * newly allocated block of memory or NULL if error. 
  * @param  src     Pointer to string holding the URL to be normalized.
  * @param  len     Length of source string. If 0, strlen() will be called.
  * @param  new_len If not NULL, pointer to a size_t where the length of the new string will be stored.
@@ -102,8 +101,7 @@ extern char *url_Encode(const char *src, size_t len, size_t *new_len);
 /**
  * Canonicalize an URL as described in 
  * https://developers.google.com/safe-browsing/developers_guide_v3#Canonicalization.
- * Current limitation : no canonicalization of IP address is made. Reserved
- * characters "!*'();:@&=+$,/?#[]" are not encoded.
+ * Reserved characters "!*'();:@&=+$,/?#[]" are not encoded.
  * Return canonicalized URL is a newly allocated buffer, or NULL if error.
  * @param  src     Pointer to source string holding the URL to be canonicalized.
  * @param  len     Length of source string. If 0, strlen() will be used.
@@ -116,8 +114,7 @@ extern char *url_Canonicalize(const char *src, size_t len, size_t *new_len);
 /**
  * Canonicalize an URL as described in 
  * https://developers.google.com/safe-browsing/developers_guide_v3#Canonicalization.
- * Current limitation : no canonicalization of IP address is made. Reserved
- * characters "!*'();:@&=+$,/?#[]" ARE encoded.
+ * Reserved characters "!*'();:@&=+$,/?#[]" ARE encoded.
  * Return canonicalized URL is a newly allocated buffer, or NULL if error.
  * @param  src     Pointer to source string holding the URL to be canonicalized.
  * @param  len     Length of source string. If 0, strlen() will be used.

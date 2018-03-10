@@ -55,10 +55,7 @@ All these functions are supposed to be thread safe. Tests were made with
 Valgrind to find and fix memory leaks.
 
 test_url.c implements the tests provided by Google in its documentation to
-help validate a canonicalization implementation. Only one test is known to 
-fail because canonicalization of IP addresses is currently not supported. 
-In case the host name has been replaced by an IP address, the address will 
-simply be kept unchanged.
+help validate a canonicalization implementation. 
 
 test_url.c also provides example of basic uses of the provided functions.
 

@@ -21,17 +21,16 @@
 void TestCanonicalize(char *url, char *expected_result)
 {
 	char *str = url_Canonicalize(url, 0, NULL);
+	
 	if(str==NULL) {
-		fprintf(stderr, "Error while canonicalizing URL\n");
-		exit(-1);
+		fprintf(stderr, "Error while canonicalizing URL [%s]\n", url);
+	} else {
+		if(strcmp(expected_result, str))
+			printf(">>> FAILED [%s]>[%s] expected [%s]>\n", url, str, expected_result);
+		else
+			printf("PASSED: [%s]>[%s]\n", url, str);
+		free(str);
 	}
-
-	if(strcmp(expected_result, str))
-		printf(">>> FAILED [%s]>[%s] expected [%s]>\n", url, str, expected_result);
-	else
-		printf("PASSED: [%s]>[%s]\n", url, str);
-
-	free(str);
 
 }
 
@@ -57,41 +56,46 @@ void TestMakeAbsolute(char *parent_url, char *url, char *expected_result)
 
 int main(int argc, char *argv[])
 {
-	char *url = "http://www.may.in/wp/le-groupe2.html/access-adress.php?bill=1274f42adc7%2Fpart%2Fabo2F&value2=put some value here; value3#fragment";
+	char *url = "http://www.test.in/wp/page.html/script.php?bill=1274fadc7%2Fpart%2Fabo2F&value2=put some value here; value3#fragment";
 
+	printf("URL                  [%s]\n", url);
 	char *url_canonicalized = url_Canonicalize(url, 0, NULL);
-	printf ("  url_canonicalized = [%s]\n", url_canonicalized);
+	printf("url_canonicalized    [%s]\n", url_canonicalized);
 	free(url_canonicalized);
 
 	char *hostname = url_GetHostname(url);
-	printf("  Hostname = [%s]\n", hostname);
+	printf("Hostname             [%s]\n", hostname);
 	free(hostname);
 	
 	char *test_url = strdup(url);
 	char *query = url_RemoveQuery(test_url, NULL);
-	printf("  url without query = [%s]\n  query = [%s]\n", test_url, query);
+	printf("url without query    [%s]\n", test_url);
+	printf("query                [%s]\n", query);
 	free(test_url);
 
 	test_url = strdup(url);
 	char *fragment = url_RemoveFragment(test_url, NULL);
-	if(fragment)
-		printf("  url without fragment =[%s]\n  fragment=[%s]\n", test_url, fragment);
+	if(fragment) {
+		printf("url without fragment [%s]\n", test_url);
+		printf("fragment             [%s]\n", fragment);
+	}
 	free(test_url);
 	
 	size_t length;
 	char *base = url_GetBase(url, 0, &length);
-	printf("  base = [%s] (%ld bytes)\n", base, length);
+	printf("base                 [%s] (%ld bytes)\n", base, length);
 	free(base);
 
 	char *url_normalized = url_Normalize(url, 0, NULL);
-	printf("  url_normalized = [%s]\n", url_normalized);
+	printf("url_normalized       [%s]\n", url_normalized);
 	free(url_normalized);
 
 	char *url_to_split = url_Normalize(url, 0, NULL);
 	char *scheme, *link;
 	url_Split(url_to_split, &scheme, &link, &query);
-	printf("  scheme = [%s]\n  link = [%s]\n  query = [%s]\n",
-		scheme, link, query);
+	printf("scheme               [%s]\n", scheme);
+	printf("link                 [%s]\n", link);
+	printf("query                [%s]\n", query);
 	char *key, *value ;
 	while(query) {
 		query = url_ParseNextKeyValuePair(query, &key, &value, NULL);
